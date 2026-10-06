@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Kyle Control Center</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Control Center</h1>
+      <p class="subtitle">Where everything stands, without becoming another project.</p>
+    </div>
+    <div class="header-actions">
+      <button id="exportAllMdBtn" class="secondary">Copy All AI Context</button>
+      <button id="backupBtn" class="secondary">Export Backup</button>
+      <label class="button secondary file-label">
+        Import Backup
+        <input id="importInput" type="file" accept=".json,application/json" />
+      </label>
+      <button id="addProjectBtn" class="primary">+ Add Project</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="backupNotice" class="backup-notice" hidden></section>
+
+    <section id="dashboardView">
+      <div class="toolbar">
+        <div class="filters" id="filters">
+          <button class="filter active" data-filter="All">All</button>
+          <button class="filter" data-filter="Active">Active</button>
+          <button class="filter" data-filter="Waiting">Waiting</button>
+          <button class="filter" data-filter="Paused">Paused</button>
+          <button class="filter" data-filter="Done">Done</button>
+        </div>
+        <div id="projectCount" class="project-count"></div>
+      </div>
+      <div id="projectList" class="project-list"></div>
+    </section>
+
+    <section id="detailView" hidden>
+      <button id="backBtn" class="back-link">← Back to all projects</button>
+
+      <div class="detail-header">
+        <div>
+          <div id="detailType" class="eyebrow"></div>
+          <h2 id="detailName"></h2>
+        </div>
+        <div class="detail-actions">
+          <button id="copyProjectMdBtn" class="secondary">Copy AI Context</button>
+          <button id="downloadProjectMdBtn" class="secondary">Download MD</button>
+          <button id="editBtn" class="primary">Edit</button>
+        </div>
+      </div>
+
+      <div id="detailContent" class="detail-grid"></div>
+      <div id="editPanel" class="edit-panel" hidden></div>
+    </section>
+  </main>
+
+  <footer>
+    <span id="storageStatus">Saved locally in this browser.</span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
