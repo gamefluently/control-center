@@ -8,6 +8,20 @@ const seedState = {
   projects: []
 };
 
+const MASTER_REFRESH_VERSION = 1;
+const MASTER_FIELDS = ["status", "objective", "nextAction", "blockers", "working", "notWorking", "completed", "backlog"];
+
+function ensureSyncState() {
+  if (!state.sync || typeof state.sync !== "object") {
+    state.sync = { lastRefresh: null, projectStates: {}, summary: null };
+  }
+  if (!state.sync.projectStates || typeof state.sync.projectStates !== "object") {
+    state.sync.projectStates = {};
+  }
+  return state.sync;
+}
+
+
 function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
@@ -176,8 +190,322 @@ function setFilter(filter) {
   renderDashboard();
 }
 
+
+function normalizeProjectName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function projectMatchScore(project, incoming) {
+  const candidates = new Set([
+    project.name,
+    projectSubtitle(project),
+    ...(Array.isArray(incoming.match) ? incoming.match : []),
+    incoming.name || ""
+  ].map(normalizeProjectName).filter(Boolean));
+
+  const projectNames = [
+    normalizeProjectName(project.name),
+    normalizeProjectName(project.id)
+  ].filter(Boolean);
+
+  let best = 0;
+  for (const p of projectNames) {
+    for (const c of candidates) {
+      if (!p || !c) continue;
+      if (p === c) best = Math.max(best, 100);
+      else if (p.includes(c) || c.includes(p)) best = Math.max(best, 80);
+      else {
+        const a = new Set(p.split(" "));
+        const b = new Set(c.split(" "));
+        const overlap = [...a].filter(x => b.has(x)).length;
+        const denom = Math.max(a.size, b.size, 1);
+        best = Math.max(best, Math.round((overlap / denom) * 60));
+      }
+    }
+  }
+  return best;
+}
+
+function findMatchingProject(incoming) {
+  const scored = state.projects
+    .map(project => ({ project, score: projectMatchScore(project, incoming) }))
+    .sort((a, b) => b.score - a.score);
+
+  return scored.length && scored[0].score >= 45 ? scored[0].project : null;
+}
+
+function getProjectSyncState(projectId) {
+  const sync = ensureSyncState();
+  return sync.projectStates[projectId] || null;
+}
+
+function renderRefreshStatus() {
+  const el = document.getElementById("refreshStatus");
+  const sync = ensureSyncState();
+
+  if (!sync.lastRefresh || !sync.summary) {
+    el.hidden = true;
+    return;
+  }
+
+  el.hidden = false;
+  const changed = Number(sync.summary.changedProjects || 0);
+  const stale = Number(sync.summary.staleProjects || 0);
+  const unmatched = Number(sync.summary.unmatchedProjects || 0);
+
+  el.innerHTML = `
+    <div class="refresh-status-copy">
+      <div class="eyebrow">LAST AI REFRESH</div>
+      <div class="refresh-status-line">
+        <span class="refresh-chip fresh">${changed} changed</span>
+        <span class="refresh-chip stale">${stale} unchanged</span>
+        ${unmatched ? `<span class="refresh-chip unmatched">${unmatched} unmatched</span>` : ""}
+      </div>
+    </div>
+    <div class="refresh-status-date">${esc(sync.lastRefresh)}</div>
+  `;
+}
+
+function validateMasterRefresh(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  if (Number(payload.controlCenterUpdate) !== MASTER_REFRESH_VERSION) return false;
+  if (!Array.isArray(payload.projects)) return false;
+  return payload.projects.every(item =>
+    item &&
+    typeof item === "object" &&
+    (typeof item.name === "string" || Array.isArray(item.match))
+  );
+}
+
+function compareMasterRefresh(payload) {
+  const results = [];
+  const claimed = new Set();
+
+  for (const incoming of payload.projects) {
+    const project = findMatchingProject(incoming);
+
+    if (!project || claimed.has(project.id)) {
+      results.push({
+        incoming,
+        project: null,
+        changedFields: [],
+        unchangedFields: [],
+        unmatched: true
+      });
+      continue;
+    }
+
+    claimed.add(project.id);
+    const changedFields = [];
+    const unchangedFields = [];
+
+    for (const key of MASTER_FIELDS) {
+      if (!Object.prototype.hasOwnProperty.call(incoming, key)) continue;
+      const value = incoming[key];
+      if (value === null || value === undefined || String(value).trim() === "") continue;
+
+      if (valuesDiffer(project[key] || "", value)) changedFields.push(key);
+      else unchangedFields.push(key);
+    }
+
+    results.push({
+      incoming,
+      project,
+      changedFields,
+      unchangedFields,
+      unmatched: false
+    });
+  }
+
+  return results;
+}
+
+let pendingMasterRefresh = null;
+
+function showMasterRefreshPreview(fileName, payload) {
+  const panel = document.getElementById("masterRefreshPanel");
+  const results = compareMasterRefresh(payload);
+  pendingMasterRefresh = { fileName, payload, results };
+
+  const matched = results.filter(r => !r.unmatched);
+  const changed = matched.filter(r => r.changedFields.length > 0);
+  const stale = matched.filter(r => r.changedFields.length === 0);
+  const unmatched = results.filter(r => r.unmatched);
+
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="master-refresh-head">
+      <div>
+        <div class="eyebrow">AI REFRESH PREVIEW</div>
+        <h3 class="master-refresh-title">${esc(fileName)}</h3>
+        <p class="master-refresh-note">
+          ${changed.length} project${changed.length === 1 ? "" : "s"} changed •
+          ${stale.length} unchanged •
+          ${unmatched.length} unmatched
+        </p>
+      </div>
+      <div class="master-refresh-actions">
+        <button id="cancelMasterRefreshBtn" class="button ghost" type="button">Cancel</button>
+        <button id="applyMasterRefreshBtn" class="button primary" type="button" ${matched.length ? "" : "disabled"}>
+          Apply Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="master-refresh-legend">
+      <span class="master-legend fresh"><span></span>Green = new / changed</span>
+      <span class="master-legend stale"><span></span>Brown = stale / unchanged</span>
+    </div>
+
+    <div class="master-project-list">
+      ${results.map(result => {
+        if (result.unmatched) {
+          return `
+            <div class="master-project-row unmatched">
+              <div>
+                <div class="master-project-name">${esc(result.incoming.name || (result.incoming.match || []).join(" / ") || "Unknown project")}</div>
+                <div class="master-project-sub">No existing Control Center project matched this update.</div>
+              </div>
+              <div class="master-state-badge unmatched">UNMATCHED</div>
+            </div>
+          `;
+        }
+
+        const changedState = result.changedFields.length > 0;
+        const fieldNames = result.changedFields.map(k => MD_FIELD_LABELS[k] || k).join(", ");
+        return `
+          <div class="master-project-row ${changedState ? "changed" : "stale"}">
+            <div>
+              <div class="master-project-name">${esc(result.project.name)}</div>
+              <div class="master-project-sub">
+                ${changedState
+                  ? `${result.changedFields.length} changed field${result.changedFields.length === 1 ? "" : "s"}: ${esc(fieldNames)}`
+                  : `Recognized, but nothing is newer than the current Control Center state.`}
+              </div>
+            </div>
+            <div class="master-state-badge ${changedState ? "fresh" : "stale"}">
+              ${changedState ? "CHANGED" : "UNCHANGED"}
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  document.getElementById("cancelMasterRefreshBtn").onclick = cancelMasterRefresh;
+  document.getElementById("applyMasterRefreshBtn").onclick = applyMasterRefresh;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelMasterRefresh() {
+  pendingMasterRefresh = null;
+  const panel = document.getElementById("masterRefreshPanel");
+  if (panel) {
+    panel.hidden = true;
+    panel.innerHTML = "";
+  }
+  const input = document.getElementById("masterRefreshInput");
+  if (input) input.value = "";
+}
+
+function applyMasterRefresh() {
+  if (!pendingMasterRefresh) return;
+
+  const { payload, results } = pendingMasterRefresh;
+  const sync = ensureSyncState();
+  const nowLabel = payload.generatedAt || todayISO();
+
+  let changedProjects = 0;
+  let staleProjects = 0;
+  let unmatchedProjects = 0;
+
+  for (const result of results) {
+    if (result.unmatched || !result.project) {
+      unmatchedProjects += 1;
+      continue;
+    }
+
+    const idx = state.projects.findIndex(p => p.id === result.project.id);
+    if (idx < 0) continue;
+
+    if (result.changedFields.length) {
+      const next = { ...state.projects[idx] };
+
+      for (const key of result.changedFields) {
+        next[key] = result.incoming[key];
+      }
+
+      next.updated = payload.generatedAt || todayISO();
+      state.projects[idx] = next;
+      sync.projectStates[next.id] = {
+        state: "changed",
+        fields: result.changedFields,
+        refreshedAt: nowLabel
+      };
+      changedProjects += 1;
+    } else {
+      sync.projectStates[result.project.id] = {
+        state: "stale",
+        fields: [],
+        refreshedAt: nowLabel
+      };
+      staleProjects += 1;
+    }
+  }
+
+  sync.lastRefresh = nowLabel;
+  sync.summary = { changedProjects, staleProjects, unmatchedProjects };
+
+  if (!saveState()) return;
+
+  pendingMasterRefresh = null;
+  cancelMasterRefresh();
+  renderDashboard();
+  renderRefreshStatus();
+
+  const panel = document.getElementById("masterRefreshPanel");
+  panel.hidden = false;
+  panel.innerHTML = `
+    <div class="master-refresh-result">
+      <div>
+        <div class="eyebrow">AI REFRESH APPLIED</div>
+        <h3 class="master-refresh-title">${changedProjects} project${changedProjects === 1 ? "" : "s"} updated</h3>
+        <p class="master-refresh-note">The dashboard is now marked green for changed projects and brown for unchanged projects.</p>
+      </div>
+      <button id="closeMasterRefreshResultBtn" class="button ghost" type="button">Close</button>
+    </div>
+  `;
+  document.getElementById("closeMasterRefreshResultBtn").onclick = cancelMasterRefresh;
+}
+
+function importMasterRefresh(file) {
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      if (!validateMasterRefresh(payload)) {
+        throw new Error("Invalid Control Center AI refresh file.");
+      }
+      showMasterRefreshPreview(file.name, payload);
+    } catch (err) {
+      alert("That file is not a valid Control Center AI refresh file. Nothing was changed.");
+      const input = document.getElementById("masterRefreshInput");
+      if (input) input.value = "";
+    }
+  };
+
+  reader.readAsText(file);
+}
+
 function renderDashboard() {
   renderSummary();
+  renderRefreshStatus();
 
   const list = document.getElementById("projectList");
   const projects = [...state.projects]
@@ -194,9 +522,16 @@ function renderDashboard() {
 
   list.innerHTML = projects.map(project => {
     const blocker = hasMeaningfulBlocker(project.blockers);
+    const syncInfo = getProjectSyncState(project.id);
+    const refreshClass = syncInfo?.state === "changed" ? "refresh-changed" : syncInfo?.state === "stale" ? "refresh-stale" : "";
+    const refreshBadge = syncInfo?.state === "changed"
+      ? `<span class="card-refresh-badge fresh">NEW</span>`
+      : syncInfo?.state === "stale"
+        ? `<span class="card-refresh-badge stale">STALE</span>`
+        : "";
 
     return `
-      <article class="project-card" data-id="${esc(project.id)}" data-type="${esc(project.type || "Project")}" tabindex="0" role="button" aria-label="Open ${esc(project.name)}">
+      <article class="project-card ${refreshClass}" data-id="${esc(project.id)}" data-type="${esc(project.type || "Project")}" tabindex="0" role="button" aria-label="Open ${esc(project.name)}">
         <div class="card-top">
           <div class="project-identity">
             <div class="project-monogram">${esc(projectMonogram(project))}</div>
@@ -205,7 +540,10 @@ function renderDashboard() {
               <div class="project-subtitle">${esc(projectSubtitle(project))}</div>
             </div>
           </div>
-          <span class="badge ${esc(project.status)}">${esc(project.status)}</span>
+          <div class="card-status-stack">
+            ${refreshBadge}
+            <span class="badge ${esc(project.status)}">${esc(project.status)}</span>
+          </div>
         </div>
 
         <div class="project-summary">${esc(excerpt(project.objective, 165))}</div>
@@ -254,7 +592,6 @@ function closeProject() {
   document.getElementById("detailView").hidden = true;
   document.getElementById("dashboardView").hidden = false;
   document.getElementById("editPanel").hidden = true;
-  cancelMdImport();
   document.getElementById("projectsNavBtn").classList.remove("active");
   document.getElementById("overviewNavBtn").classList.add("active");
   renderDashboard();
@@ -420,6 +757,8 @@ function normalizeHeading(value) {
     .toLowerCase()
     .replace(/[`*_~]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/^\d+\s+/, "")
     .trim();
 }
 
@@ -427,12 +766,35 @@ function headingToField(heading) {
   const h = normalizeHeading(heading);
 
   if (["objective", "current objective", "current direction"].includes(h)) return "objective";
-  if (["next action", "immediate priority", "next operating instruction"].includes(h)) return "nextAction";
-  if (h === "blockers" || h.startsWith("current issue") || h === "reason paused") return "blockers";
-  if (["working", "current state"].includes(h)) return "working";
-  if (h === "not working" || h.startsWith("not working not yet verified")) return "notWorking";
-  if (["recently completed", "completed"].includes(h)) return "completed";
-  if (["backlog", "deferred work"].includes(h)) return "backlog";
+
+  if (
+    ["next action", "immediate priority", "next operating instruction", "next milestone", "next tinyfish milestone"].includes(h) ||
+    h.endsWith(" next milestone")
+  ) return "nextAction";
+
+  if (
+    h === "blockers" ||
+    h.startsWith("current issue") ||
+    h === "reason paused" ||
+    h === "current blocker"
+  ) return "blockers";
+
+  if (
+    ["working", "current state", "current status", "current work state snapshot"].includes(h)
+  ) return "working";
+
+  if (
+    h === "not working" ||
+    h.startsWith("not working not yet verified") ||
+    h === "not yet verified"
+  ) return "notWorking";
+
+  if (["recently completed", "completed", "completed work"].includes(h)) return "completed";
+
+  if (
+    ["backlog", "deferred work", "next project catalog candidate"].includes(h)
+  ) return "backlog";
+
   if (h === "status") return "status";
 
   return null;
@@ -460,6 +822,19 @@ function normalizeImportedStatus(value) {
   return null;
 }
 
+
+function normalizeForComparison(value) {
+  return String(value ?? "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function valuesDiffer(currentValue, incomingValue) {
+  return normalizeForComparison(currentValue) !== normalizeForComparison(incomingValue);
+}
+
 function parseProjectUpdateMarkdown(markdown) {
   const text = String(markdown || "").replace(/\r\n?/g, "\n");
   const lines = text.split("\n");
@@ -467,7 +842,7 @@ function parseProjectUpdateMarkdown(markdown) {
   let current = null;
 
   for (const line of lines) {
-    const match = line.match(/^#{2,4}\s+(.+?)\s*$/);
+    const match = line.match(/^#{1,4}\s+(.+?)\s*$/);
     if (match) {
       if (current) sections.push(current);
       current = { heading: match[1], lines: [] };
@@ -533,11 +908,11 @@ function showMdImportPreview(fileName, parsed) {
         <div>
           <div class="eyebrow">MD UPDATE</div>
           <h3 class="md-import-title">Nothing recognized</h3>
-          <p class="md-import-note">${esc(fileName)} does not contain Control Center headings I can safely map.</p>
+          <p class="md-import-note">${esc(fileName)} does not contain headings I can safely map to this project.</p>
         </div>
       </div>
       <div class="md-import-empty">
-        Use headings such as Objective, Next Action, Blockers, Working, Not Working, Recently Completed, Backlog, and Status. Nothing has been changed.
+        Nothing has been changed. Future update files work best with headings such as Objective, Next Action, Blockers, Working, Not Working, Recently Completed, Backlog, and Status.
       </div>
       <div class="md-import-actions">
         <button id="cancelMdImportBtn" class="button ghost" type="button">Close</button>
@@ -547,37 +922,74 @@ function showMdImportPreview(fileName, parsed) {
     return;
   }
 
+  const diff = keys.map(key => ({
+    key,
+    incoming: parsed.changes[key],
+    current: project[key] || "",
+    changed: valuesDiffer(project[key] || "", parsed.changes[key])
+  }));
+
+  const changedItems = diff.filter(item => item.changed);
+  const unchangedItems = diff.filter(item => !item.changed);
+
+  pendingMdUpdate = Object.fromEntries(changedItems.map(item => [item.key, item.incoming]));
+
   panel.innerHTML = `
     <div class="md-import-head">
       <div>
         <div class="eyebrow">MD UPDATE PREVIEW</div>
-        <h3 class="md-import-title">Review before applying</h3>
-        <p class="md-import-note">${esc(fileName)} • ${keys.length} field${keys.length === 1 ? "" : "s"} recognized. Missing fields stay unchanged.</p>
+        <h3 class="md-import-title">What actually changed?</h3>
+        <p class="md-import-note">${esc(fileName)} • ${keys.length} field${keys.length === 1 ? "" : "s"} recognized.</p>
+      </div>
+      <div class="md-diff-totals">
+        <span class="md-diff-count fresh">${changedItems.length} changed</span>
+        <span class="md-diff-count stale">${unchangedItems.length} unchanged</span>
       </div>
     </div>
+
+    <div class="md-diff-legend">
+      <span class="md-legend-item fresh"><span class="md-legend-dot"></span>Green = new / changed</span>
+      <span class="md-legend-item stale"><span class="md-legend-dot"></span>Brown = stale / no change</span>
+    </div>
+
     <div class="md-preview-grid">
-      ${keys.map(key => {
-        const incoming = parsed.changes[key];
-        const old = project[key] || "—";
-        const full = ["objective","nextAction","blockers","working","notWorking","completed","backlog"].includes(key);
+      ${diff.map(item => {
+        const full = ["objective","nextAction","blockers","working","notWorking","completed","backlog"].includes(item.key);
         return `
-          <div class="md-preview-card ${full ? "full" : ""}">
-            <div class="md-preview-label">${esc(MD_FIELD_LABELS[key])}</div>
-            <div class="md-preview-new">${esc(incoming)}</div>
-            <div class="md-preview-old">Current: ${esc(excerpt(old, 180))}</div>
+          <div class="md-preview-card ${item.changed ? "changed" : "unchanged"} ${full ? "full" : ""}">
+            <div class="md-preview-topline">
+              <div class="md-preview-label">${esc(MD_FIELD_LABELS[item.key])}</div>
+              <div class="md-change-state ${item.changed ? "fresh" : "stale"}">${item.changed ? "CHANGED" : "UNCHANGED"}</div>
+            </div>
+            <div class="md-preview-new">${esc(item.incoming)}</div>
+            <div class="md-preview-old">Current: ${esc(excerpt(item.current || "—", 220))}</div>
           </div>
         `;
       }).join("")}
     </div>
-    <div class="md-import-summary">Only the fields shown above will change. Project name, type, ID, and any missing sections remain untouched.</div>
+
+    <div class="md-import-summary">
+      ${changedItems.length
+        ? `Applying this file will update ${changedItems.length} field${changedItems.length === 1 ? "" : "s"}. Unchanged fields will not be rewritten.`
+        : `Everything recognized in this file already matches the Control Center. There is nothing new to apply.`}
+    </div>
+
     <div class="md-import-actions">
-      <button id="cancelMdImportBtn" class="button ghost" type="button">Cancel</button>
-      <button id="applyMdImportBtn" class="button primary" type="button">Apply Update</button>
+      <button id="cancelMdImportBtn" class="button ghost" type="button">${changedItems.length ? "Cancel" : "Close"}</button>
+      ${changedItems.length
+        ? `<button id="applyMdImportBtn" class="button primary" type="button">Apply ${changedItems.length} Change${changedItems.length === 1 ? "" : "s"}</button>`
+        : ""}
     </div>
   `;
 
   document.getElementById("cancelMdImportBtn").onclick = cancelMdImport;
-  document.getElementById("applyMdImportBtn").onclick = applyPendingMdUpdate;
+  const applyButton = document.getElementById("applyMdImportBtn");
+  if (applyButton) applyButton.onclick = () => applyPendingMdUpdate({
+    fileName,
+    changedKeys: changedItems.map(item => item.key),
+    unchangedKeys: unchangedItems.map(item => item.key)
+  });
+
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -588,24 +1000,66 @@ function cancelMdImport() {
   panel.innerHTML = "";
 }
 
-function applyPendingMdUpdate() {
+function applyPendingMdUpdate(resultMeta = null) {
   if (!pendingMdUpdate || !currentProjectId) return;
   const idx = state.projects.findIndex(p => p.id === currentProjectId);
   if (idx < 0) return;
 
   const next = { ...state.projects[idx] };
+  const changedKeys = [];
+
   for (const [key, value] of Object.entries(pendingMdUpdate)) {
-    if (value !== null && value !== undefined && String(value).trim() !== "") {
+    if (
+      value !== null &&
+      value !== undefined &&
+      String(value).trim() !== "" &&
+      valuesDiffer(next[key] || "", value)
+    ) {
       next[key] = value;
+      changedKeys.push(key);
     }
   }
+
+  if (!changedKeys.length) {
+    pendingMdUpdate = null;
+    return;
+  }
+
   next.updated = todayISO();
   state.projects[idx] = next;
 
   if (!saveState()) return;
-  cancelMdImport();
+
+  pendingMdUpdate = null;
   renderDetail();
-  alert("Project updated from Markdown.");
+
+  const panel = document.getElementById("mdImportPanel");
+  panel.hidden = false;
+
+  const staleKeys = resultMeta?.unchangedKeys || [];
+  panel.innerHTML = `
+    <div class="md-import-result">
+      <div>
+        <div class="eyebrow">UPDATE APPLIED</div>
+        <h3 class="md-import-title">${changedKeys.length} field${changedKeys.length === 1 ? "" : "s"} updated</h3>
+        <p class="md-import-note">${esc(resultMeta?.fileName || "Markdown update")} has been applied to ${esc(state.projects[idx].name)}.</p>
+      </div>
+      <div class="md-diff-totals">
+        <span class="md-diff-count fresh">${changedKeys.length} new</span>
+        <span class="md-diff-count stale">${staleKeys.length} stale</span>
+      </div>
+    </div>
+    <div class="md-applied-fields">
+      ${changedKeys.map(key => `<span class="md-field-chip fresh">${esc(MD_FIELD_LABELS[key])}</span>`).join("")}
+      ${staleKeys.map(key => `<span class="md-field-chip stale">${esc(MD_FIELD_LABELS[key])}</span>`).join("")}
+    </div>
+    <div class="md-import-actions">
+      <button id="closeMdResultBtn" class="button ghost" type="button">Close</button>
+    </div>
+  `;
+
+  document.getElementById("closeMdResultBtn").onclick = cancelMdImport;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function importProjectMarkdown(file) {
@@ -766,14 +1220,14 @@ document.getElementById("downloadProjectMdBtn").onclick = () => {
 };
 
 
-document.getElementById("projectMdInput").addEventListener("change", event => {
-  const file = event.target.files?.[0];
-  if (file) importProjectMarkdown(file);
-  event.target.value = "";
-});
 
 document.getElementById("exportAllMdBtn").onclick = () => copyText(allProjectsMarkdown());
 document.getElementById("backupBtn").onclick = exportBackup;
+document.getElementById("masterRefreshInput").addEventListener("change", e => {
+  const file = e.target.files?.[0];
+  if (file) importMasterRefresh(file);
+});
+
 document.getElementById("importInput").addEventListener("change", e => {
   if (e.target.files?.[0]) importBackup(e.target.files[0]);
   e.target.value = "";

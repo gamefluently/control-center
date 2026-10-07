@@ -1018,3 +1018,344 @@ footer {
     grid-column: auto;
   }
 }
+
+
+/* V1.2.1 — clear Markdown import diff states */
+.md-diff-totals,
+.md-diff-legend,
+.md-applied-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.md-diff-totals {
+  justify-content: flex-end;
+}
+
+.md-diff-count,
+.md-field-chip,
+.md-legend-item,
+.md-change-state {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.md-diff-count,
+.md-field-chip {
+  padding: 6px 9px;
+  font-size: 10px;
+}
+
+.md-diff-count.fresh,
+.md-field-chip.fresh {
+  border: 1px solid rgba(94, 201, 137, .32);
+  background: rgba(94, 201, 137, .10);
+  color: #8ee0ae;
+}
+
+.md-diff-count.stale,
+.md-field-chip.stale {
+  border: 1px solid rgba(166, 121, 76, .36);
+  background: rgba(166, 121, 76, .11);
+  color: #c59b70;
+}
+
+.md-diff-legend {
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.md-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  background: #0c121b;
+}
+
+.md-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.md-legend-item.fresh .md-legend-dot {
+  background: #65cf91;
+}
+
+.md-legend-item.stale .md-legend-dot {
+  background: #a6794c;
+}
+
+.md-preview-card.changed {
+  border-color: rgba(94, 201, 137, .48);
+  background:
+    linear-gradient(180deg, rgba(94, 201, 137, .08), rgba(13, 19, 29, 1));
+  box-shadow: inset 3px 0 0 rgba(94, 201, 137, .85);
+}
+
+.md-preview-card.unchanged {
+  border-color: rgba(166, 121, 76, .38);
+  background:
+    linear-gradient(180deg, rgba(166, 121, 76, .07), rgba(13, 19, 29, 1));
+  box-shadow: inset 3px 0 0 rgba(166, 121, 76, .75);
+}
+
+.md-preview-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.md-preview-topline .md-preview-label {
+  margin-bottom: 0;
+}
+
+.md-change-state {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  font-size: 8px;
+  letter-spacing: .10em;
+}
+
+.md-change-state.fresh {
+  background: rgba(94, 201, 137, .12);
+  color: #8ee0ae;
+}
+
+.md-change-state.stale {
+  background: rgba(166, 121, 76, .12);
+  color: #c59b70;
+}
+
+.md-import-result {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.md-applied-fields {
+  margin-top: 14px;
+}
+
+@media (max-width: 620px) {
+  .md-import-head,
+  .md-import-result {
+    flex-direction: column;
+  }
+
+  .md-diff-totals {
+    justify-content: flex-start;
+  }
+}
+
+
+/* V2.0 — centralized AI refresh */
+.refresh-status {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(17, 23, 34, .78);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.refresh-status-line,
+.master-refresh-legend,
+.master-refresh-actions,
+.card-status-stack {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.card-status-stack {
+  justify-content: flex-end;
+}
+
+.refresh-chip,
+.card-refresh-badge,
+.master-state-badge,
+.master-legend {
+  border-radius: 999px;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.refresh-chip {
+  padding: 6px 9px;
+  font-size: 9px;
+}
+
+.refresh-chip.fresh,
+.card-refresh-badge.fresh,
+.master-state-badge.fresh {
+  border: 1px solid rgba(92, 207, 139, .34);
+  background: rgba(92, 207, 139, .11);
+  color: #8ee0ae;
+}
+
+.refresh-chip.stale,
+.card-refresh-badge.stale,
+.master-state-badge.stale {
+  border: 1px solid rgba(168, 120, 72, .42);
+  background: rgba(168, 120, 72, .12);
+  color: #c99b6d;
+}
+
+.refresh-chip.unmatched,
+.master-state-badge.unmatched {
+  border: 1px solid rgba(231,189,99,.30);
+  background: rgba(231,189,99,.08);
+  color: #dfc27d;
+}
+
+.refresh-status-date {
+  color: var(--muted-2);
+  font-size: 10px;
+}
+
+.project-card.refresh-changed {
+  border-color: rgba(92, 207, 139, .48);
+  box-shadow: inset 3px 0 0 rgba(92, 207, 139, .90);
+}
+
+.project-card.refresh-stale {
+  border-color: rgba(168, 120, 72, .42);
+  box-shadow: inset 3px 0 0 rgba(168, 120, 72, .78);
+}
+
+.card-refresh-badge {
+  padding: 4px 7px;
+  font-size: 8px;
+}
+
+.master-refresh-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  padding: 18px;
+  background: var(--panel);
+}
+
+.master-refresh-head,
+.master-refresh-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.master-refresh-title {
+  margin: 0 0 7px;
+  font-size: 19px;
+}
+
+.master-refresh-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.master-refresh-legend {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.master-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  background: #0c121b;
+}
+
+.master-legend span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.master-legend.fresh span {
+  background: #5ccf8b;
+}
+
+.master-legend.stale span {
+  background: #a87848;
+}
+
+.master-project-list {
+  margin-top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.master-project-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #0d131d;
+}
+
+.master-project-row.changed {
+  border-color: rgba(92, 207, 139, .34);
+  box-shadow: inset 3px 0 0 rgba(92, 207, 139, .84);
+}
+
+.master-project-row.stale {
+  border-color: rgba(168, 120, 72, .34);
+  box-shadow: inset 3px 0 0 rgba(168, 120, 72, .72);
+}
+
+.master-project-row.unmatched {
+  border-color: rgba(231,189,99,.24);
+}
+
+.master-project-name {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.master-project-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.master-state-badge {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  font-size: 8px;
+}
+
+@media (max-width: 620px) {
+  .refresh-status,
+  .master-refresh-head,
+  .master-refresh-result,
+  .master-project-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .header-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}

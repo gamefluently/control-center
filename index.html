@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0a0d12" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Kyle Control Center</title>
-  <link rel="stylesheet" href="styles.css?v=1.2.0" />
+  <link rel="stylesheet" href="styles.css?v=2.0.0" />
 </head>
 <body>
   <div class="app-shell">
@@ -72,13 +72,16 @@
             </div>
 
             <div class="header-actions">
-              <button id="exportAllMdBtn" class="button ghost">Copy AI Context</button>
+              <label class="button primary file-label">
+                Import AI Refresh
+                <input id="masterRefreshInput" type="file" accept=".json,application/json" />
+              </label>
               <button id="backupBtn" class="button ghost">Export Backup</button>
               <label class="button ghost file-label">
                 Import Backup
                 <input id="importInput" type="file" accept=".json,application/json" />
               </label>
-              <button id="addProjectBtn" class="button primary">+ Add Project</button>
+              <button id="addProjectBtn" class="button ghost">+ Add Project</button>
             </div>
           </div>
 
@@ -107,6 +110,9 @@
               <div class="summary-note">Closed out</div>
             </button>
           </section>
+
+          <section id="refreshStatus" class="refresh-status" hidden></section>
+          <section id="masterRefreshPanel" class="master-refresh-panel" hidden></section>
 
           <section id="projectsSection" class="projects-section">
             <div class="section-heading">
@@ -142,16 +148,11 @@
             <div class="detail-actions">
               <button id="copyProjectMdBtn" class="button ghost" type="button">Copy AI Context</button>
               <button id="downloadProjectMdBtn" class="button ghost" type="button">Download MD</button>
-              <label class="button ghost file-label">
-                Import MD Update
-                <input id="projectMdInput" type="file" accept=".md,.markdown,text/markdown,text/plain" />
-              </label>
               <button id="editBtn" class="button primary" type="button">Edit</button>
             </div>
           </div>
 
           <div id="detailContent" class="detail-grid"></div>
-          <div id="mdImportPanel" class="md-import-panel" hidden></div>
           <div id="editPanel" class="edit-panel" hidden></div>
         </section>
       </main>
@@ -162,6 +163,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=1.2.0"></script>
+  <script src="app.js?v=2.0.0"></script>
 </body>
 </html>
