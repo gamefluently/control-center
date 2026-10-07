@@ -254,6 +254,7 @@ function closeProject() {
   document.getElementById("detailView").hidden = true;
   document.getElementById("dashboardView").hidden = false;
   document.getElementById("editPanel").hidden = true;
+  cancelMdImport();
   document.getElementById("projectsNavBtn").classList.remove("active");
   document.getElementById("overviewNavBtn").classList.add("active");
   renderDashboard();
@@ -402,6 +403,225 @@ function deleteCurrentProject() {
   closeProject();
 }
 
+
+const MD_FIELD_LABELS = {
+  status: "Status",
+  objective: "Objective",
+  nextAction: "Next Action",
+  blockers: "Blockers",
+  working: "Working",
+  notWorking: "Not Working",
+  completed: "Recently Completed",
+  backlog: "Backlog"
+};
+
+function normalizeHeading(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[`*_~]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function headingToField(heading) {
+  const h = normalizeHeading(heading);
+
+  if (["objective", "current objective", "current direction"].includes(h)) return "objective";
+  if (["next action", "immediate priority", "next operating instruction"].includes(h)) return "nextAction";
+  if (h === "blockers" || h.startsWith("current issue") || h === "reason paused") return "blockers";
+  if (["working", "current state"].includes(h)) return "working";
+  if (h === "not working" || h.startsWith("not working not yet verified")) return "notWorking";
+  if (["recently completed", "completed"].includes(h)) return "completed";
+  if (["backlog", "deferred work"].includes(h)) return "backlog";
+  if (h === "status") return "status";
+
+  return null;
+}
+
+function cleanMarkdownValue(value) {
+  return String(value || "")
+    .replace(/\\\s*$/gm, "")
+    .replace(/^>\s?/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^[-*_]{3,}\s*$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeImportedStatus(value) {
+  const v = normalizeHeading(value);
+  if (!v) return null;
+  if (/\b(active|live|operating|in progress)\b/.test(v)) return "Active";
+  if (/\b(waiting|blocked|pending|on hold)\b/.test(v)) return "Waiting";
+  if (/\b(paused|parked|inactive)\b/.test(v)) return "Paused";
+  if (/\b(done|complete|completed|closed|finished)\b/.test(v)) return "Done";
+  return null;
+}
+
+function parseProjectUpdateMarkdown(markdown) {
+  const text = String(markdown || "").replace(/\r\n?/g, "\n");
+  const lines = text.split("\n");
+  const sections = [];
+  let current = null;
+
+  for (const line of lines) {
+    const match = line.match(/^#{2,4}\s+(.+?)\s*$/);
+    if (match) {
+      if (current) sections.push(current);
+      current = { heading: match[1], lines: [] };
+    } else if (current) {
+      current.lines.push(line);
+    }
+  }
+  if (current) sections.push(current);
+
+  const changes = {};
+  const recognizedHeadings = [];
+
+  for (const section of sections) {
+    const field = headingToField(section.heading);
+    if (!field || Object.prototype.hasOwnProperty.call(changes, field)) continue;
+    const value = cleanMarkdownValue(section.lines.join("\n"));
+    if (!value) continue;
+    changes[field] = field === "status" ? normalizeImportedStatus(value) : value;
+    if (changes[field]) recognizedHeadings.push(section.heading);
+  }
+
+  // Also accept common bold metadata near the top, e.g. **Status:** ACTIVE --- ...
+  if (!changes.status) {
+    const statusMatch = text.match(/^\s*\*\*Status:\*\*\s*(.+)$/mi) || text.match(/^\s*Status:\s*(.+)$/mi);
+    if (statusMatch) {
+      const status = normalizeImportedStatus(statusMatch[1]);
+      if (status) changes.status = status;
+    }
+  }
+
+  // These aliases are useful for existing Control Center update files that use a broader heading.
+  if (!changes.working) {
+    const currentStatus = sections.find(s => normalizeHeading(s.heading) === "current status");
+    if (currentStatus) {
+      const value = cleanMarkdownValue(currentStatus.lines.join("\n"));
+      if (value) changes.working = value;
+    }
+  }
+
+  return {
+    changes,
+    recognizedCount: Object.keys(changes).length,
+    recognizedHeadings
+  };
+}
+
+let pendingMdUpdate = null;
+
+function showMdImportPreview(fileName, parsed) {
+  const panel = document.getElementById("mdImportPanel");
+  const project = state.projects.find(p => p.id === currentProjectId);
+  if (!project) return;
+
+  pendingMdUpdate = parsed.changes;
+  panel.hidden = false;
+
+  const keys = ["status", "objective", "nextAction", "blockers", "working", "notWorking", "completed", "backlog"]
+    .filter(key => Object.prototype.hasOwnProperty.call(parsed.changes, key));
+
+  if (!keys.length) {
+    panel.innerHTML = `
+      <div class="md-import-head">
+        <div>
+          <div class="eyebrow">MD UPDATE</div>
+          <h3 class="md-import-title">Nothing recognized</h3>
+          <p class="md-import-note">${esc(fileName)} does not contain Control Center headings I can safely map.</p>
+        </div>
+      </div>
+      <div class="md-import-empty">
+        Use headings such as Objective, Next Action, Blockers, Working, Not Working, Recently Completed, Backlog, and Status. Nothing has been changed.
+      </div>
+      <div class="md-import-actions">
+        <button id="cancelMdImportBtn" class="button ghost" type="button">Close</button>
+      </div>
+    `;
+    document.getElementById("cancelMdImportBtn").onclick = cancelMdImport;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="md-import-head">
+      <div>
+        <div class="eyebrow">MD UPDATE PREVIEW</div>
+        <h3 class="md-import-title">Review before applying</h3>
+        <p class="md-import-note">${esc(fileName)} • ${keys.length} field${keys.length === 1 ? "" : "s"} recognized. Missing fields stay unchanged.</p>
+      </div>
+    </div>
+    <div class="md-preview-grid">
+      ${keys.map(key => {
+        const incoming = parsed.changes[key];
+        const old = project[key] || "—";
+        const full = ["objective","nextAction","blockers","working","notWorking","completed","backlog"].includes(key);
+        return `
+          <div class="md-preview-card ${full ? "full" : ""}">
+            <div class="md-preview-label">${esc(MD_FIELD_LABELS[key])}</div>
+            <div class="md-preview-new">${esc(incoming)}</div>
+            <div class="md-preview-old">Current: ${esc(excerpt(old, 180))}</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+    <div class="md-import-summary">Only the fields shown above will change. Project name, type, ID, and any missing sections remain untouched.</div>
+    <div class="md-import-actions">
+      <button id="cancelMdImportBtn" class="button ghost" type="button">Cancel</button>
+      <button id="applyMdImportBtn" class="button primary" type="button">Apply Update</button>
+    </div>
+  `;
+
+  document.getElementById("cancelMdImportBtn").onclick = cancelMdImport;
+  document.getElementById("applyMdImportBtn").onclick = applyPendingMdUpdate;
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelMdImport() {
+  pendingMdUpdate = null;
+  const panel = document.getElementById("mdImportPanel");
+  panel.hidden = true;
+  panel.innerHTML = "";
+}
+
+function applyPendingMdUpdate() {
+  if (!pendingMdUpdate || !currentProjectId) return;
+  const idx = state.projects.findIndex(p => p.id === currentProjectId);
+  if (idx < 0) return;
+
+  const next = { ...state.projects[idx] };
+  for (const [key, value] of Object.entries(pendingMdUpdate)) {
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      next[key] = value;
+    }
+  }
+  next.updated = todayISO();
+  state.projects[idx] = next;
+
+  if (!saveState()) return;
+  cancelMdImport();
+  renderDetail();
+  alert("Project updated from Markdown.");
+}
+
+function importProjectMarkdown(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = parseProjectUpdateMarkdown(reader.result);
+      showMdImportPreview(file.name, parsed);
+    } catch (err) {
+      alert("That Markdown file could not be read. Nothing was changed.");
+    }
+  };
+  reader.onerror = () => alert("That Markdown file could not be read. Nothing was changed.");
+  reader.readAsText(file);
+}
+
 function projectMarkdown(p) {
   return `# ${p.name}
 Updated: ${p.updated || "Unknown"}
@@ -544,6 +764,13 @@ document.getElementById("downloadProjectMdBtn").onclick = () => {
   const p = state.projects.find(x => x.id === currentProjectId);
   if (p) downloadText(`${p.id}-CURRENT_STATE.md`, projectMarkdown(p), "text/markdown");
 };
+
+
+document.getElementById("projectMdInput").addEventListener("change", event => {
+  const file = event.target.files?.[0];
+  if (file) importProjectMarkdown(file);
+  event.target.value = "";
+});
 
 document.getElementById("exportAllMdBtn").onclick = () => copyText(allProjectsMarkdown());
 document.getElementById("backupBtn").onclick = exportBackup;

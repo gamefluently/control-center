@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0a0d12" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Kyle Control Center</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=1.2.0" />
 </head>
 <body>
   <div class="app-shell">
@@ -142,11 +142,16 @@
             <div class="detail-actions">
               <button id="copyProjectMdBtn" class="button ghost" type="button">Copy AI Context</button>
               <button id="downloadProjectMdBtn" class="button ghost" type="button">Download MD</button>
+              <label class="button ghost file-label">
+                Import MD Update
+                <input id="projectMdInput" type="file" accept=".md,.markdown,text/markdown,text/plain" />
+              </label>
               <button id="editBtn" class="button primary" type="button">Edit</button>
             </div>
           </div>
 
           <div id="detailContent" class="detail-grid"></div>
+          <div id="mdImportPanel" class="md-import-panel" hidden></div>
           <div id="editPanel" class="edit-panel" hidden></div>
         </section>
       </main>
@@ -157,6 +162,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=1.2.0"></script>
 </body>
 </html>
