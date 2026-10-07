@@ -593,68 +593,146 @@ function importMasterRefresh(file) {
   reader.readAsText(file);
 }
 
+
+const LAYOUT_DEMO_PROJECTS = [
+  {
+    id: "demo-fag",
+    name: "FAG Updates",
+    type: "Business",
+    status: "Active",
+    objective: "Field Atlas Goods live operations and marketing state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-lnf",
+    name: "LNF Updates",
+    type: "Business",
+    status: "Active",
+    objective: "Lantern Nine Foundry current business and automation state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-thai-bf",
+    name: "Thai BF VN",
+    type: "Project",
+    status: "Active",
+    objective: "Thai-learning visual novel development state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-freelance",
+    name: "Freelance Work",
+    type: "Business",
+    status: "Active",
+    objective: "Upwork, proposals, Project Catalog, and income work.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-commo",
+    name: "CommoStudioCo",
+    type: "Business",
+    status: "Paused",
+    objective: "CommoStudio brand and product state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-yfo",
+    name: "YFO",
+    type: "Personal",
+    status: "Active",
+    objective: "Visual diary and posting state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-thai-language",
+    name: "Thai Language",
+    type: "Personal",
+    status: "Active",
+    objective: "Thai class, reading, writing, and practice state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  },
+  {
+    id: "demo-visa",
+    name: "Visa",
+    type: "Personal",
+    status: "Active",
+    objective: "Immigration, school, and visa timing state.",
+    nextAction: "Next action goes here.",
+    image: ""
+  }
+];
+
 function renderDashboard() {
-  renderSummary();
   renderRefreshStatus();
 
   const list = document.getElementById("projectList");
-  const projects = [...state.projects]
-    .sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || a.name.localeCompare(b.name));
+  const usingDemo = state.projects.length === 0;
+  const projects = usingDemo
+    ? LAYOUT_DEMO_PROJECTS
+    : [...state.projects].sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || a.name.localeCompare(b.name));
 
   document.getElementById("projectCount").textContent =
-    `${projects.length} project${projects.length === 1 ? "" : "s"}`;
-
-  if (!projects.length) {
-    list.innerHTML = `<div class="empty-state">No projects are loaded. Use <strong>Import AI Refresh</strong> once and the dashboard will rebuild them automatically.</div>`;
-    return;
-  }
+    usingDemo ? "Layout preview" : `${projects.length} project${projects.length === 1 ? "" : "s"}`;
 
   list.innerHTML = projects.map(project => {
-    const syncInfo = getProjectSyncState(project.id);
+    const syncInfo = usingDemo ? null : getProjectSyncState(project.id);
     const refreshClass = syncInfo?.state === "changed" ? "refresh-changed" : syncInfo?.state === "stale" ? "refresh-stale" : "";
     const image = projectImage(project);
 
     return `
-      <article class="project-card board-card ${refreshClass}" data-id="${esc(project.id)}" tabindex="0" role="button" aria-label="Open ${esc(project.name)}">
+      <article class="project-card board-card ${refreshClass} ${usingDemo ? "layout-demo-card" : ""}"
+        data-id="${esc(project.id)}"
+        tabindex="0"
+        role="button"
+        aria-label="${usingDemo ? "Layout preview " : "Open "}${esc(project.name)}">
+
+        <div class="board-card-image ${image ? "has-image" : "empty-image"}">
+          ${
+            image
+              ? `<img src="${esc(image)}" alt="${esc(projectImageAlt(project))}" loading="lazy" />`
+              : `<div class="image-placeholder"><span>Optional image</span></div>`
+          }
+        </div>
+
         <div class="board-card-top">
-          <div>
-            <div class="project-name">${esc(project.name)}</div>
-            <div class="project-subtitle">${esc(projectSubtitle(project))}</div>
-          </div>
+          <div class="project-name">${esc(project.name)}</div>
           <span class="badge ${esc(project.status)}">${esc(project.status)}</span>
         </div>
 
         <div class="board-card-body">
           <div class="board-block current-block">
             <div class="meta-label">Current</div>
-            <div class="board-current">${esc(excerpt(project.objective, 165))}</div>
+            <div class="board-current">${esc(excerpt(project.objective, 150))}</div>
           </div>
 
           <div class="board-block next-block">
             <div class="meta-label">Next Action</div>
-            <div class="board-next">${esc(excerpt(project.nextAction || "None", 175))}</div>
+            <div class="board-next">${esc(excerpt(project.nextAction || "None", 150))}</div>
           </div>
-        </div>
-
-        <div class="board-card-image ${image ? "has-image" : "empty-image"}">
-          ${image
-            ? `<img src="${esc(image)}" alt="${esc(projectImageAlt(project))}" loading="lazy" />`
-            : `<div class="image-placeholder"><span>Optional project image</span></div>`}
         </div>
       </article>
     `;
   }).join("");
 
-  document.querySelectorAll(".project-card").forEach(card => {
-    const open = () => openProject(card.dataset.id);
-    card.addEventListener("click", open);
-    card.addEventListener("keydown", event => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        open();
-      }
+  if (!usingDemo) {
+    document.querySelectorAll(".project-card").forEach(card => {
+      const open = () => openProject(card.dataset.id);
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
     });
-  });
+  }
 }
 
 function openProject(id) {

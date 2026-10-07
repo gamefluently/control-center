@@ -135,3 +135,264 @@ h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
   .detail-grid,.form-grid { grid-template-columns: 1fr; }
   .field.full,.info-card.full { grid-column: auto; }
 }
+
+
+/* V3.1 — board layout preview matching Kyle's sketch */
+.backup-notice,
+.refresh-status {
+  display: none !important;
+}
+
+.board-main {
+  width: min(1680px, calc(100% - 36px));
+  padding: 18px 0 26px;
+}
+
+.board-header {
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.board-header .eyebrow,
+.board-header .hero-copy {
+  display: none;
+}
+
+.board-header h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -.02em;
+}
+
+.header-actions .button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 11px;
+}
+
+.projects-section {
+  margin-top: 6px;
+}
+
+.board-section-heading {
+  margin-bottom: 10px;
+}
+
+.board-section-heading .eyebrow {
+  display: none;
+}
+
+.board-section-heading h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.project-list {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.board-card {
+  min-height: 415px;
+  height: calc((100vh - 155px) / 2);
+  max-height: 500px;
+  border-radius: 2px;
+  background: #efefef;
+  border-color: #8b8b8b;
+}
+
+.board-card:hover {
+  transform: none;
+  border-color: #666;
+}
+
+.board-card-top {
+  min-height: 58px;
+  padding: 12px 13px 10px;
+  border-bottom: 0;
+  background: #efefef;
+}
+
+.project-name {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.project-subtitle {
+  display: none;
+}
+
+.badge {
+  font-size: 8px;
+  padding: 4px 7px;
+}
+
+.board-card-body {
+  padding: 10px 13px;
+  gap: 10px;
+}
+
+.board-block {
+  min-height: 58px;
+}
+
+.next-block {
+  padding-top: 9px;
+  border-top: 1px solid #cfcfcf;
+}
+
+.meta-label {
+  margin-bottom: 4px;
+  font-size: 8px;
+}
+
+.board-current,
+.board-next {
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.board-card-image {
+  min-height: 175px;
+  height: 45%;
+  border-top: 1px solid #c9c9c9;
+  background: #dddddd;
+}
+
+.board-card-image img {
+  min-height: 175px;
+  object-fit: contain;
+  object-position: center bottom;
+  background: #dddddd;
+}
+
+.image-placeholder {
+  min-height: 100%;
+  color: #9c9c9c;
+  background: #dddddd;
+  font-size: 10px;
+}
+
+.layout-demo-card {
+  cursor: default;
+}
+
+.layout-demo-card .image-placeholder::before {
+  content: "";
+}
+
+@media (max-width: 1200px) {
+  .project-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board-card {
+    height: auto;
+    min-height: 500px;
+    max-height: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .project-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* V3.2 — image-first cards */
+.board-card {
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.board-card-image {
+  order: 1;
+  height: 245px;
+  min-height: 245px;
+  border-top: 0;
+  border-bottom: 1px solid #c9c9c9;
+  background: #dddddd;
+}
+
+.board-card-image img {
+  width: 100%;
+  height: 245px;
+  min-height: 245px;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.image-placeholder {
+  min-height: 245px;
+}
+
+.board-card-top {
+  order: 2;
+  min-height: 54px;
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid #cfcfcf;
+}
+
+.project-name {
+  font-size: 17px;
+}
+
+.board-card-body {
+  order: 3;
+  padding: 12px 14px 14px;
+  gap: 12px;
+  flex: 1 1 auto;
+}
+
+.board-block {
+  min-height: 0;
+}
+
+.current-block {
+  min-height: 64px;
+}
+
+.next-block {
+  margin-top: auto;
+  padding-top: 11px;
+  border-top: 1px solid #cfcfcf;
+}
+
+.board-current {
+  font-size: 11px;
+  line-height: 1.42;
+}
+
+.board-next {
+  font-size: 12px;
+  line-height: 1.42;
+  font-weight: 750;
+}
+
+@media (min-width: 1201px) {
+  .board-card {
+    min-height: 470px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .board-card-image,
+  .board-card-image img,
+  .image-placeholder {
+    height: 220px;
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 700px) {
+  .board-card-image,
+  .board-card-image img,
+  .image-placeholder {
+    height: 210px;
+    min-height: 210px;
+  }
+}

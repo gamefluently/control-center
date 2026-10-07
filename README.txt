@@ -1,22 +1,18 @@
-CONTROL CENTER — LAYOUT V3 BRANCH TEST
+CONTROL CENTER — V3.2 IMAGE-FIRST LAYOUT TEST
 
-This is a layout-only branch test. Keep main untouched.
+Branch-only visual test.
 
-Homepage changes:
-- 4 tall project cards across on wide desktop
-- 2 across on medium screens
-- 1 across on mobile
-- project title + status at top
-- CURRENT summary
-- NEXT ACTION
-- optional image zone anchored to the bottom
-- sidebar, count tiles, and filters are visually hidden for this board test
+Card order:
+1. Image
+2. Project name + status
+3. Current
+4. Next Action
 
-Logic intentionally preserved:
-- localStorage key
-- project data
-- AI Refresh
-- backup import/export
-- project detail/edit behavior
+The goal of this version is to test the visual hierarchy only.
 
-The image slot is visual only in this layout test. We will decide how images are set after the layout itself is approved.
+No changes were made to:
+- AI Refresh logic
+- Backup/import logic
+- Project data structure
+- LocalStorage key
+- Main branch
