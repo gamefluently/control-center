@@ -256,13 +256,14 @@ function renderRefreshStatus() {
   el.hidden = false;
   const changed = Number(sync.summary.changedProjects || 0);
   const stale = Number(sync.summary.staleProjects || 0);
+  const created = Number(sync.summary.createdProjects || 0);
   const unmatched = Number(sync.summary.unmatchedProjects || 0);
 
   el.innerHTML = `
     <div class="refresh-status-copy">
       <div class="eyebrow">LAST AI REFRESH</div>
       <div class="refresh-status-line">
-        <span class="refresh-chip fresh">${changed} changed</span>
+        <span class="refresh-chip fresh">${changed} changed${created ? ` • ${created} created` : ""}</span>
         <span class="refresh-chip stale">${stale} unchanged</span>
         ${unmatched ? `<span class="refresh-chip unmatched">${unmatched} unmatched</span>` : ""}
       </div>
@@ -282,6 +283,47 @@ function validateMasterRefresh(payload) {
   );
 }
 
+
+function slugifyProjectId(value) {
+  const slug = String(value || "project")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return slug || ("project-" + Date.now());
+}
+
+function inferProjectType(incoming) {
+  const explicit = String(incoming.type || "").trim();
+  if (["Business", "Personal", "Project", "Client"].includes(explicit)) return explicit;
+
+  const name = normalizeProjectName(incoming.name || "");
+  if (name.includes("yfo") || name.includes("yearfortyone") || name.includes("thai learning")) return "Personal";
+  if (name.includes("thai bf") || name.includes("gamefluently")) return "Project";
+  return "Business";
+}
+
+function buildProjectFromRefresh(incoming, generatedAt) {
+  const status = ["Active", "Waiting", "Paused", "Done"].includes(incoming.status)
+    ? incoming.status
+    : "Active";
+
+  return {
+    id: String(incoming.id || slugifyProjectId(incoming.name)),
+    name: String(incoming.name || "Untitled Project"),
+    type: inferProjectType(incoming),
+    status,
+    objective: String(incoming.objective || ""),
+    nextAction: String(incoming.nextAction || ""),
+    blockers: String(incoming.blockers || ""),
+    working: String(incoming.working || ""),
+    notWorking: String(incoming.notWorking || ""),
+    completed: String(incoming.completed || ""),
+    backlog: String(incoming.backlog || ""),
+    updated: String(generatedAt || todayISO())
+  };
+}
+
 function compareMasterRefresh(payload) {
   const results = [];
   const claimed = new Set();
@@ -293,9 +335,15 @@ function compareMasterRefresh(payload) {
       results.push({
         incoming,
         project: null,
-        changedFields: [],
+        changedFields: MASTER_FIELDS.filter(key =>
+          Object.prototype.hasOwnProperty.call(incoming, key) &&
+          incoming[key] !== null &&
+          incoming[key] !== undefined &&
+          String(incoming[key]).trim() !== ""
+        ),
         unchangedFields: [],
-        unmatched: true
+        unmatched: true,
+        canCreate: !project
       });
       continue;
     }
@@ -318,7 +366,8 @@ function compareMasterRefresh(payload) {
       project,
       changedFields,
       unchangedFields,
-      unmatched: false
+      unmatched: false,
+      canCreate: false
     });
   }
 
@@ -336,6 +385,7 @@ function showMasterRefreshPreview(fileName, payload) {
   const changed = matched.filter(r => r.changedFields.length > 0);
   const stale = matched.filter(r => r.changedFields.length === 0);
   const unmatched = results.filter(r => r.unmatched);
+  const creatable = unmatched.filter(r => r.canCreate);
 
   panel.hidden = false;
   panel.innerHTML = `
@@ -346,12 +396,12 @@ function showMasterRefreshPreview(fileName, payload) {
         <p class="master-refresh-note">
           ${changed.length} project${changed.length === 1 ? "" : "s"} changed •
           ${stale.length} unchanged •
-          ${unmatched.length} unmatched
+          ${unmatched.length} new/unmatched
         </p>
       </div>
       <div class="master-refresh-actions">
         <button id="cancelMasterRefreshBtn" class="button ghost" type="button">Cancel</button>
-        <button id="applyMasterRefreshBtn" class="button primary" type="button" ${matched.length ? "" : "disabled"}>
+        <button id="applyMasterRefreshBtn" class="button primary" type="button" ${(matched.length || creatable.length) ? "" : "disabled"}>
           Apply Refresh
         </button>
       </div>
@@ -369,9 +419,11 @@ function showMasterRefreshPreview(fileName, payload) {
             <div class="master-project-row unmatched">
               <div>
                 <div class="master-project-name">${esc(result.incoming.name || (result.incoming.match || []).join(" / ") || "Unknown project")}</div>
-                <div class="master-project-sub">No existing Control Center project matched this update.</div>
+                <div class="master-project-sub">${result.canCreate
+                  ? "No existing card matched. This project will be created from the AI Refresh."
+                  : "Could not safely match this update."}</div>
               </div>
-              <div class="master-state-badge unmatched">UNMATCHED</div>
+              <div class="master-state-badge unmatched">${result.canCreate ? "CREATE" : "UNMATCHED"}</div>
             </div>
           `;
         }
@@ -422,10 +474,37 @@ function applyMasterRefresh() {
 
   let changedProjects = 0;
   let staleProjects = 0;
+  let createdProjects = 0;
   let unmatchedProjects = 0;
 
   for (const result of results) {
-    if (result.unmatched || !result.project) {
+    if (result.unmatched) {
+      if (result.canCreate) {
+        const created = buildProjectFromRefresh(result.incoming, nowLabel);
+
+        // Prevent accidental duplicate IDs.
+        let candidateId = created.id;
+        let suffix = 2;
+        while (state.projects.some(p => p.id === candidateId)) {
+          candidateId = created.id + "-" + suffix++;
+        }
+        created.id = candidateId;
+
+        state.projects.push(created);
+        sync.projectStates[created.id] = {
+          state: "changed",
+          fields: result.changedFields,
+          refreshedAt: nowLabel
+        };
+        createdProjects += 1;
+        changedProjects += 1;
+      } else {
+        unmatchedProjects += 1;
+      }
+      continue;
+    }
+
+    if (!result.project) {
       unmatchedProjects += 1;
       continue;
     }
@@ -440,7 +519,7 @@ function applyMasterRefresh() {
         next[key] = result.incoming[key];
       }
 
-      next.updated = payload.generatedAt || todayISO();
+      next.updated = nowLabel;
       state.projects[idx] = next;
       sync.projectStates[next.id] = {
         state: "changed",
@@ -459,7 +538,7 @@ function applyMasterRefresh() {
   }
 
   sync.lastRefresh = nowLabel;
-  sync.summary = { changedProjects, staleProjects, unmatchedProjects };
+  sync.summary = { changedProjects, staleProjects, createdProjects, unmatchedProjects };
 
   if (!saveState()) return;
 
@@ -475,7 +554,10 @@ function applyMasterRefresh() {
       <div>
         <div class="eyebrow">AI REFRESH APPLIED</div>
         <h3 class="master-refresh-title">${changedProjects} project${changedProjects === 1 ? "" : "s"} updated</h3>
-        <p class="master-refresh-note">The dashboard is now marked green for changed projects and brown for unchanged projects.</p>
+        <p class="master-refresh-note">
+          ${createdProjects ? `${createdProjects} project${createdProjects === 1 ? "" : "s"} recreated from the refresh. ` : ""}
+          Green = changed/new. Brown = recognized but unchanged.
+        </p>
       </div>
       <button id="closeMasterRefreshResultBtn" class="button ghost" type="button">Close</button>
     </div>
@@ -516,7 +598,7 @@ function renderDashboard() {
     `${projects.length} project${projects.length === 1 ? "" : "s"}`;
 
   if (!projects.length) {
-    list.innerHTML = `<div class="empty-state">No projects in this view.</div>`;
+    list.innerHTML = `<div class="empty-state">No projects are loaded. Use <strong>Import AI Refresh</strong> once and the dashboard will rebuild them automatically.</div>`;
     return;
   }
 
@@ -1205,9 +1287,9 @@ function updateBackupNotice() {
   }
 }
 
-document.getElementById("backBtn").onclick = closeProject;
-document.getElementById("editBtn").onclick = () => showEditor(false);
-document.getElementById("addProjectBtn").onclick = () => showEditor(true);
+document.getElementById("backBtn")?.addEventListener("click", closeProject);
+document.getElementById("editBtn")?.addEventListener("click", () => showEditor(false));
+document.getElementById("addProjectBtn")?.addEventListener("click", () => showEditor(true));
 
 document.getElementById("copyProjectMdBtn").onclick = () => {
   const p = state.projects.find(x => x.id === currentProjectId);
@@ -1221,14 +1303,13 @@ document.getElementById("downloadProjectMdBtn").onclick = () => {
 
 
 
-document.getElementById("exportAllMdBtn").onclick = () => copyText(allProjectsMarkdown());
-document.getElementById("backupBtn").onclick = exportBackup;
-document.getElementById("masterRefreshInput").addEventListener("change", e => {
+document.getElementById("backupBtn")?.addEventListener("click", exportBackup);
+document.getElementById("masterRefreshInput")?.addEventListener("change", e => {
   const file = e.target.files?.[0];
   if (file) importMasterRefresh(file);
 });
 
-document.getElementById("importInput").addEventListener("change", e => {
+document.getElementById("importInput")?.addEventListener("change", e => {
   if (e.target.files?.[0]) importBackup(e.target.files[0]);
   e.target.value = "";
 });
