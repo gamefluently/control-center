@@ -120,6 +120,14 @@ function statusOrder(status) {
 }
 
 
+function projectImage(project) {
+  return String(project.image || "").trim();
+}
+
+function projectImageAlt(project) {
+  return `${project.name || "Project"} image`;
+}
+
 function projectSubtitle(project) {
   const name = (project.name || "").toLowerCase();
 
@@ -591,7 +599,6 @@ function renderDashboard() {
 
   const list = document.getElementById("projectList");
   const projects = [...state.projects]
-    .filter(p => currentFilter === "All" || p.status === currentFilter)
     .sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || a.name.localeCompare(b.name));
 
   document.getElementById("projectCount").textContent =
@@ -603,45 +610,36 @@ function renderDashboard() {
   }
 
   list.innerHTML = projects.map(project => {
-    const blocker = hasMeaningfulBlocker(project.blockers);
     const syncInfo = getProjectSyncState(project.id);
     const refreshClass = syncInfo?.state === "changed" ? "refresh-changed" : syncInfo?.state === "stale" ? "refresh-stale" : "";
-    const refreshBadge = syncInfo?.state === "changed"
-      ? `<span class="card-refresh-badge fresh">NEW</span>`
-      : syncInfo?.state === "stale"
-        ? `<span class="card-refresh-badge stale">STALE</span>`
-        : "";
+    const image = projectImage(project);
 
     return `
-      <article class="project-card ${refreshClass}" data-id="${esc(project.id)}" data-type="${esc(project.type || "Project")}" tabindex="0" role="button" aria-label="Open ${esc(project.name)}">
-        <div class="card-top">
-          <div class="project-identity">
-            <div class="project-monogram">${esc(projectMonogram(project))}</div>
-            <div>
-              <div class="project-name">${esc(project.name)}</div>
-              <div class="project-subtitle">${esc(projectSubtitle(project))}</div>
-            </div>
+      <article class="project-card board-card ${refreshClass}" data-id="${esc(project.id)}" tabindex="0" role="button" aria-label="Open ${esc(project.name)}">
+        <div class="board-card-top">
+          <div>
+            <div class="project-name">${esc(project.name)}</div>
+            <div class="project-subtitle">${esc(projectSubtitle(project))}</div>
           </div>
-          <div class="card-status-stack">
-            ${refreshBadge}
-            <span class="badge ${esc(project.status)}">${esc(project.status)}</span>
+          <span class="badge ${esc(project.status)}">${esc(project.status)}</span>
+        </div>
+
+        <div class="board-card-body">
+          <div class="board-block current-block">
+            <div class="meta-label">Current</div>
+            <div class="board-current">${esc(excerpt(project.objective, 165))}</div>
+          </div>
+
+          <div class="board-block next-block">
+            <div class="meta-label">Next Action</div>
+            <div class="board-next">${esc(excerpt(project.nextAction || "None", 175))}</div>
           </div>
         </div>
 
-        <div class="project-summary">${esc(excerpt(project.objective, 165))}</div>
-
-        <div class="card-divider"></div>
-
-        <div class="meta-label">Next</div>
-        <div class="next-action">${esc(excerpt(project.nextAction || "None", 175))}</div>
-
-        <div class="card-footer">
-          ${
-            blocker
-              ? `<div class="blocker-chip"><span class="blocker-dot"></span><span>Blocker</span></div>`
-              : `<div class="no-blocker">No active blocker</div>`
-          }
-          <div class="updated">Updated ${esc(project.updated || "—")}</div>
+        <div class="board-card-image ${image ? "has-image" : "empty-image"}">
+          ${image
+            ? `<img src="${esc(image)}" alt="${esc(projectImageAlt(project))}" loading="lazy" />`
+            : `<div class="image-placeholder"><span>Optional project image</span></div>`}
         </div>
       </article>
     `;

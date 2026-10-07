@@ -1,27 +1,22 @@
-KYLE CONTROL CENTER — V2.0.1 RECOVERY FIX
+CONTROL CENTER — LAYOUT V3 BRANCH TEST
 
-WHAT THIS FIXES
-V2 could open with zero project cards if the browser's saved project state was missing or had already been reset.
+This is a layout-only branch test. Keep main untouched.
 
-V2.0.1 changes the centralized AI Refresh so it can CREATE missing project cards from the single refresh file.
+Homepage changes:
+- 4 tall project cards across on wide desktop
+- 2 across on medium screens
+- 1 across on mobile
+- project title + status at top
+- CURRENT summary
+- NEXT ACTION
+- optional image zone anchored to the bottom
+- sidebar, count tiles, and filters are visually hidden for this board test
 
-NORMAL WORKFLOW
-1. Say "Update Control Center" in the central ChatGPT conversation.
-2. Download the ONE AI Refresh JSON file.
-3. Click Import AI Refresh.
-4. Preview all projects.
-5. Click Apply Refresh once.
+Logic intentionally preserved:
+- localStorage key
+- project data
+- AI Refresh
+- backup import/export
+- project detail/edit behavior
 
-If the dashboard is empty:
-- The same AI Refresh file recreates the missing project cards.
-- No manual Add Project work is required.
-
-VISUAL STATE
-- GREEN = new or changed during the most recent refresh.
-- BROWN = recognized but unchanged/stale.
-
-FILES TO REPLACE
-- index.html
-- styles.css
-- app.js
-- README.txt
+The image slot is visual only in this layout test. We will decide how images are set after the layout itself is approved.
