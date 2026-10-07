@@ -1,45 +1,44 @@
-KYLE CONTROL CENTER — V1
+KYLE CONTROL CENTER — V1.1
 
-WHAT THIS IS
-A simple static project-control dashboard for GitHub Pages.
-No backend. No database. No login. No npm. No build step.
+WHAT CHANGED
+V1.1 is a visual redesign only.
+The storage model, JSON backup/import, AI context export, project editing, and privacy model remain the same.
 
-FILES
+NEW V1.1 LAYOUT
+- Desktop sidebar
+- Mobile header/menu
+- Status summary tiles
+- Two-column project card dashboard on larger screens
+- One-column project cards on mobile
+- Short project summaries instead of a wall of text
+- Clear NEXT action and blocker indicator
+- Existing project detail/edit screens preserved
+
+PRIVACY
+- The public code contains no personal project data.
+- Your real project data stays in browser localStorage.
+- Your JSON backup contains your private project data; keep it private.
+- The app keeps the same localStorage key as V1.0.1, so updating these files should preserve the data already stored in the same browser/site.
+
+FILES TO COPY INTO YOUR EXISTING GITHUB REPO
 - index.html
 - styles.css
 - app.js
+- README.txt
 
-GITHUB PAGES SETUP
-1. Create a new GitHub repository (example: control-center).
-2. Upload all three files to the repository root.
-3. Commit the files.
-4. Open repository Settings → Pages.
-5. Under Build and deployment:
-   Source: Deploy from a branch
-   Branch: main
-   Folder: / (root)
-6. Save.
-7. Open the GitHub Pages URL after GitHub finishes publishing.
+UPDATE STEPS
+1. Make sure you already have a recent JSON backup.
+2. Copy the four V1.1 files into your local control-center GitHub folder.
+3. Allow them to replace the existing files.
+4. Open GitHub Desktop.
+5. Commit the changed files.
+6. Push to origin.
+7. GitHub Pages should redeploy automatically.
+8. Refresh the live Control Center site.
 
-HOW SAVING WORKS
-- Edits save automatically in the browser you are using.
-- Laptop, iPad, and iPhone DO NOT automatically sync.
-- Use "Export Backup" to download the JSON state.
-- Use "Import Backup" on another device to move that state there.
-- The site warns you if you have never exported a backup or the last backup is 7+ days old.
-
-AI HANDOFF
-- Open one project and use "Copy AI Context" or "Download MD".
-- From the main dashboard, "Copy All AI Context" gives a short summary of every project.
-- Paste that text into ChatGPT, Claude, Gemini, or another AI when you need to resume work.
+IF THE LIVE SITE LOOKS OLD
+GitHub Pages/browser caching can take a short time to update.
+Refresh again after a minute or use a normal reload before changing anything else.
 
 IMPORTANT
-The JSON backup is your portable source of truth.
-Browser localStorage is only the working copy.
-
-
-PRIVACY / SAFETY
-- The public code contains no personal project data.
-- Your project data lives only in this browser's localStorage unless you export it.
-- JSON backups should be treated as private files.
-- If an older public repo contained personal starter data inside app.js, delete that repo and recreate it with this cleaned version to remove that history from the normal public repository.
+Do not delete your JSON backup just because the site update works.

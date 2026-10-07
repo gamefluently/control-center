@@ -73,8 +73,11 @@ function validateState(candidate) {
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const stamp = new Date().toLocaleString();
     document.getElementById("storageStatus").textContent =
-      "Saved locally in this browser • " + new Date().toLocaleString();
+      "Saved locally in this browser • " + stamp;
+    const sideStatus = document.getElementById("sidebarStorageStatus");
+    if (sideStatus) sideStatus.textContent = "Saved locally • " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     updateBackupNotice();
     return true;
   } catch (err) {
@@ -102,7 +105,80 @@ function statusOrder(status) {
   return { Active: 0, Waiting: 1, Paused: 2, Done: 3 }[status] ?? 9;
 }
 
+
+function projectSubtitle(project) {
+  const name = (project.name || "").toLowerCase();
+
+  if (name.includes("lantern") || name === "lnf") return "Digital product business";
+  if (name === "fag" || name.includes("field atlas")) return "Autonomous e-commerce";
+  if (name.includes("thai bf") || name.includes("gamefluently")) return "Thai learning game";
+  if (name.includes("income") || name.includes("upwork") || name.includes("job")) return "Freelance & job search";
+  if (name.includes("yfo") || name.includes("yearfortyone")) return "Visual diary";
+  if (name.includes("commostudio")) return "Fashion / product brand";
+  if (name.includes("thai learning")) return "Language learning";
+
+  return project.type || "Project";
+}
+
+function projectMonogram(project) {
+  const words = String(project.name || "")
+    .replace(/[\/_-]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!words.length) return "PR";
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+function excerpt(value, max = 150) {
+  const clean = String(value || "").replace(/\s+/g, " ").trim();
+  if (!clean) return "No summary yet.";
+  if (clean.length <= max) return clean;
+  return clean.slice(0, max - 1).trimEnd() + "…";
+}
+
+function hasMeaningfulBlocker(value) {
+  const clean = String(value || "").trim().toLowerCase();
+  if (!clean || clean === "—" || clean === "none" || clean === "no blocker") return false;
+  if (clean.startsWith("no immediate blocker")) return false;
+  if (clean.startsWith("no current blocker")) return false;
+  if (clean.startsWith("nothing fundamentally broken")) return false;
+  return true;
+}
+
+function renderSummary() {
+  const counts = { Active: 0, Waiting: 0, Paused: 0, Done: 0 };
+
+  state.projects.forEach(project => {
+    if (Object.prototype.hasOwnProperty.call(counts, project.status)) {
+      counts[project.status] += 1;
+    }
+  });
+
+  document.getElementById("summaryActive").textContent = counts.Active;
+  document.getElementById("summaryWaiting").textContent = counts.Waiting;
+  document.getElementById("summaryPaused").textContent = counts.Paused;
+  document.getElementById("summaryDone").textContent = counts.Done;
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+
+  document.querySelectorAll(".filter").forEach(button => {
+    button.classList.toggle("active", button.dataset.filter === filter);
+  });
+
+  document.querySelectorAll(".summary-card").forEach(card => {
+    card.classList.toggle("active-summary", card.dataset.filterSummary === filter);
+  });
+
+  renderDashboard();
+}
+
 function renderDashboard() {
+  renderSummary();
+
   const list = document.getElementById("projectList");
   const projects = [...state.projects]
     .filter(p => currentFilter === "All" || p.status === currentFilter)
@@ -112,26 +188,54 @@ function renderDashboard() {
     `${projects.length} project${projects.length === 1 ? "" : "s"}`;
 
   if (!projects.length) {
-    list.innerHTML = `<div class="info-card"><p>No projects in this view.</p></div>`;
+    list.innerHTML = `<div class="empty-state">No projects in this view.</div>`;
     return;
   }
 
-  list.innerHTML = projects.map(p => `
-    <article class="project-card" data-id="${esc(p.id)}">
-      <div>
-        <div class="project-name">${esc(p.name)}</div>
-        <div class="project-type">${esc(p.type || "")} • Updated ${esc(p.updated || "—")}</div>
-      </div>
-      <div class="project-next">
-        <strong>Next action</strong>
-        ${esc(p.nextAction || "None")}
-      </div>
-      <div><span class="badge ${esc(p.status)}">${esc(p.status)}</span></div>
-    </article>
-  `).join("");
+  list.innerHTML = projects.map(project => {
+    const blocker = hasMeaningfulBlocker(project.blockers);
+
+    return `
+      <article class="project-card" data-id="${esc(project.id)}" data-type="${esc(project.type || "Project")}" tabindex="0" role="button" aria-label="Open ${esc(project.name)}">
+        <div class="card-top">
+          <div class="project-identity">
+            <div class="project-monogram">${esc(projectMonogram(project))}</div>
+            <div>
+              <div class="project-name">${esc(project.name)}</div>
+              <div class="project-subtitle">${esc(projectSubtitle(project))}</div>
+            </div>
+          </div>
+          <span class="badge ${esc(project.status)}">${esc(project.status)}</span>
+        </div>
+
+        <div class="project-summary">${esc(excerpt(project.objective, 165))}</div>
+
+        <div class="card-divider"></div>
+
+        <div class="meta-label">Next</div>
+        <div class="next-action">${esc(excerpt(project.nextAction || "None", 175))}</div>
+
+        <div class="card-footer">
+          ${
+            blocker
+              ? `<div class="blocker-chip"><span class="blocker-dot"></span><span>Blocker</span></div>`
+              : `<div class="no-blocker">No active blocker</div>`
+          }
+          <div class="updated">Updated ${esc(project.updated || "—")}</div>
+        </div>
+      </article>
+    `;
+  }).join("");
 
   document.querySelectorAll(".project-card").forEach(card => {
-    card.addEventListener("click", () => openProject(card.dataset.id));
+    const open = () => openProject(card.dataset.id);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    });
   });
 }
 
@@ -139,6 +243,8 @@ function openProject(id) {
   currentProjectId = id;
   document.getElementById("dashboardView").hidden = true;
   document.getElementById("detailView").hidden = false;
+  document.getElementById("overviewNavBtn").classList.remove("active");
+  document.getElementById("projectsNavBtn").classList.add("active");
   renderDetail();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -148,6 +254,8 @@ function closeProject() {
   document.getElementById("detailView").hidden = true;
   document.getElementById("dashboardView").hidden = false;
   document.getElementById("editPanel").hidden = true;
+  document.getElementById("projectsNavBtn").classList.remove("active");
+  document.getElementById("overviewNavBtn").classList.add("active");
   renderDashboard();
 }
 
@@ -445,10 +553,54 @@ document.getElementById("importInput").addEventListener("change", e => {
 });
 
 document.querySelectorAll(".filter").forEach(btn => {
-  btn.addEventListener("click", () => {
-    currentFilter = btn.dataset.filter;
-    document.querySelectorAll(".filter").forEach(x => x.classList.toggle("active", x === btn));
-    renderDashboard();
+  btn.addEventListener("click", () => setFilter(btn.dataset.filter));
+});
+
+document.querySelectorAll(".summary-card").forEach(card => {
+  card.addEventListener("click", () => {
+    const filter = card.dataset.filterSummary;
+    setFilter(filter);
+    document.getElementById("projectsSection").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+});
+
+document.getElementById("overviewNavBtn").addEventListener("click", () => {
+  closeProject();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+document.getElementById("projectsNavBtn").addEventListener("click", () => {
+  if (currentProjectId) closeProject();
+  document.getElementById("projectsSection").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+document.getElementById("backupNavBtn").addEventListener("click", exportBackup);
+
+const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+const mobileMenu = document.getElementById("mobileMenu");
+
+mobileMenuBtn.addEventListener("click", () => {
+  const open = mobileMenu.hidden;
+  mobileMenu.hidden = !open;
+  mobileMenuBtn.setAttribute("aria-expanded", String(open));
+});
+
+document.querySelectorAll(".mobile-nav").forEach(button => {
+  button.addEventListener("click", () => {
+    const action = button.dataset.action;
+
+    if (action === "backup") {
+      exportBackup();
+    } else if (action === "projects") {
+      if (currentProjectId) closeProject();
+      document.getElementById("projectsSection").scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      closeProject();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    mobileMenu.hidden = true;
+    mobileMenuBtn.setAttribute("aria-expanded", "false");
   });
 });
 
