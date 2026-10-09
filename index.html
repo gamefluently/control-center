@@ -3,166 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0a0d12" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Kyle Control Center</title>
-  <link rel="stylesheet" href="styles.css?v=2.0.1" />
+  <meta name="theme-color" content="#f2efe8" />
+  <title>Control Center</title>
+  <link rel="stylesheet" href="styles.css?v=simple-1" />
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand-block">
-        <div class="brand-mark">CC</div>
-        <div>
-          <div class="brand-name">Control Center</div>
-          <div class="brand-sub">Personal operations</div>
-        </div>
-      </div>
-
-      <nav class="side-nav" aria-label="Control Center">
-        <button class="nav-item active" id="overviewNavBtn" type="button">
-          <span class="nav-icon">◫</span>
-          <span>Overview</span>
-        </button>
-        <button class="nav-item" id="projectsNavBtn" type="button">
-          <span class="nav-icon">▦</span>
-          <span>Projects</span>
-        </button>
-        <button class="nav-item" id="backupNavBtn" type="button">
-          <span class="nav-icon">⇩</span>
-          <span>Backup</span>
-        </button>
-      </nav>
-
-      <div class="sidebar-bottom">
-        <div class="storage-mini">
-          <span class="storage-dot"></span>
-          <span id="sidebarStorageStatus">Local browser storage</span>
-        </div>
-      </div>
-    </aside>
-
-    <div class="main-shell">
-      <header class="mobile-header">
-        <div class="mobile-brand">
-          <div class="brand-mark small">CC</div>
+  <div class="app-shell board-shell">
+    <main class="board-main">
+      <section id="dashboardView">
+        <div class="board-header">
           <div>
-            <div class="brand-name">Control Center</div>
-            <div class="brand-sub">Personal operations</div>
+            <div class="eyebrow">CONTROL CENTER</div>
+            <h1>Project Board</h1>
+            <p class="hero-copy">Where everything stands and what happens next.</p>
           </div>
+          <div id="lastUpdated" class="last-updated"></div>
         </div>
-        <button id="mobileMenuBtn" class="icon-button" type="button" aria-expanded="false" aria-controls="mobileMenu">☰</button>
-      </header>
 
-      <div id="mobileMenu" class="mobile-menu" hidden>
-        <button class="mobile-nav active" data-action="overview" type="button">Overview</button>
-        <button class="mobile-nav" data-action="projects" type="button">Projects</button>
-        <button class="mobile-nav" data-action="backup" type="button">Export Backup</button>
-      </div>
-
-      <main>
-        <section id="backupNotice" class="backup-notice" hidden></section>
-
-        <section id="dashboardView">
-          <div class="hero-row">
+        <section class="projects-section">
+          <div class="section-heading board-section-heading">
             <div>
-              <div class="eyebrow">OPERATIONS OVERVIEW</div>
-              <h1>Control Center</h1>
-              <p class="hero-copy">One place to see what is active, what is waiting, and what happens next.</p>
+              <div class="eyebrow">PROJECTS</div>
+              <h2>Current work</h2>
             </div>
-
-            <div class="header-actions">
-              <label class="button primary file-label">
-                Import AI Refresh
-                <input id="masterRefreshInput" type="file" accept=".json,application/json" />
-              </label>
-              <button id="backupBtn" class="button ghost">Export Backup</button>
-              <label class="button ghost file-label">
-                Import Backup
-                <input id="importInput" type="file" accept=".json,application/json" />
-              </label>
-              <button id="addProjectBtn" class="button ghost">+ Add Project</button>
-            </div>
+            <div id="projectCount" class="project-count"></div>
           </div>
-
-          <section class="summary-grid" aria-label="Project status summary">
-            <button class="summary-card active-summary" data-filter-summary="Active" type="button">
-              <div class="summary-label">Active</div>
-              <div id="summaryActive" class="summary-value">0</div>
-              <div class="summary-note">In motion</div>
-            </button>
-
-            <button class="summary-card" data-filter-summary="Waiting" type="button">
-              <div class="summary-label">Waiting</div>
-              <div id="summaryWaiting" class="summary-value">0</div>
-              <div class="summary-note">Blocked or pending</div>
-            </button>
-
-            <button class="summary-card" data-filter-summary="Paused" type="button">
-              <div class="summary-label">Paused</div>
-              <div id="summaryPaused" class="summary-value">0</div>
-              <div class="summary-note">Not current</div>
-            </button>
-
-            <button class="summary-card" data-filter-summary="Done" type="button">
-              <div class="summary-label">Done</div>
-              <div id="summaryDone" class="summary-value">0</div>
-              <div class="summary-note">Closed out</div>
-            </button>
-          </section>
-
-          <section id="refreshStatus" class="refresh-status" hidden></section>
-          <section id="masterRefreshPanel" class="master-refresh-panel" hidden></section>
-
-          <section id="projectsSection" class="projects-section">
-            <div class="section-heading">
-              <div>
-                <div class="eyebrow">PROJECTS</div>
-                <h2>Current work</h2>
-              </div>
-              <div class="section-tools">
-                <div class="filters" id="filters" aria-label="Project filters">
-                  <button class="filter active" data-filter="All" type="button">All</button>
-                  <button class="filter" data-filter="Active" type="button">Active</button>
-                  <button class="filter" data-filter="Waiting" type="button">Waiting</button>
-                  <button class="filter" data-filter="Paused" type="button">Paused</button>
-                  <button class="filter" data-filter="Done" type="button">Done</button>
-                </div>
-                <div id="projectCount" class="project-count"></div>
-              </div>
-            </div>
-
-            <div id="projectList" class="project-list"></div>
-          </section>
+          <div id="projectList" class="project-list"></div>
         </section>
-
-        <section id="detailView" hidden>
-          <button id="backBtn" class="back-link" type="button">← Back to overview</button>
-
-          <div class="detail-header">
-            <div>
-              <div id="detailType" class="eyebrow"></div>
-              <h2 id="detailName"></h2>
-            </div>
-
-            <div class="detail-actions">
-              <button id="copyProjectMdBtn" class="button ghost" type="button">Copy AI Context</button>
-              <button id="downloadProjectMdBtn" class="button ghost" type="button">Download MD</button>
-              <button id="editBtn" class="button primary" type="button">Edit</button>
-            </div>
-          </div>
-
-          <div id="detailContent" class="detail-grid"></div>
-          <div id="editPanel" class="edit-panel" hidden></div>
-        </section>
-      </main>
-
-      <footer>
-        <span id="storageStatus">Saved locally in this browser.</span>
-      </footer>
-    </div>
+      </section>
+    </main>
   </div>
 
-  <script src="app.js?v=2.0.1"></script>
+  <script src="control-center-state.js?v=simple-1"></script>
+  <script src="app.js?v=simple-1"></script>
 </body>
 </html>

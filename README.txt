@@ -1,18 +1,19 @@
-CONTROL CENTER — V3.2 IMAGE-FIRST LAYOUT TEST
+CONTROL CENTER — SIMPLE VERSION
 
-Branch-only visual test.
+Files:
+- index.html
+- styles.css
+- app.js
+- control-center-state.js
+- README.txt
 
-Card order:
-1. Image
-2. Project name + status
-3. Current
-4. Next Action
+Normal updates after installation:
+1. Ask ChatGPT: "Update Control Center."
+2. Replace ONLY control-center-state.js.
+3. Commit and push.
 
-The goal of this version is to test the visual hierarchy only.
-
-No changes were made to:
-- AI Refresh logic
-- Backup/import logic
-- Project data structure
-- LocalStorage key
-- Main branch
+No localStorage.
+No import parser.
+No backup import.
+No project matching.
+Eight fixed cards.
